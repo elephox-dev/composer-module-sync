@@ -1,0 +1,28 @@
+{
+    "name": "elephox/composer-module-sync",
+    "description": "A composer plugin to sync requirements between submodules.",
+    "type": "composer-plugin",
+    "require": {
+        "php": ">=8.1",
+        "composer-plugin-api": "^2.1"
+    },
+    "require-dev": {
+        "composer/composer": "^2.0"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Elephox\\ComposerModuleSync\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Ricardo Boss",
+            "email": "contact@ricardoboss.de"
+        }
+    ],
+    "minimum-stability": "dev",
+    "extra": {
+        "class": "Elephox\\ComposerModuleSync\\Plugin"
+    }
+}
