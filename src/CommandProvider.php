@@ -11,6 +11,7 @@ class CommandProvider implements ComposerCommandProvider
     {
         return [
             new Commands\CheckCommand(),
+            new Commands\AddRequireCommand(),
         ];
     }
 }

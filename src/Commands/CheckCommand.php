@@ -3,10 +3,8 @@ declare(strict_types=1);
 
 namespace Elephox\ComposerModuleSync\Commands;
 
-use Composer\Command\BaseCommand;
 use JsonException;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class CheckCommand extends BaseCommand
@@ -15,7 +13,7 @@ class CheckCommand extends BaseCommand
     {
         $this->setName('modules:check');
         $this->setDescription('Check if all requirements are in sync.');
-        $this->addOption("module-dir", "m", InputOption::VALUE_REQUIRED, "Relative path to module directory.", "modules");
+        $this->addModulesDirOption();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -29,7 +27,6 @@ class CheckCommand extends BaseCommand
 
         $output->writeln('Checking requirements...', OutputInterface::VERBOSITY_VERBOSE);
 
-        $rootDirectory = $this->getApplication()->getInitialWorkingDirectory();
         $rootRequirementTargets = array_map(static fn($require) => $require->getTarget(), $package->getRequires());
         $rootRequirementVersions = array_map(static fn($require) => $require->getConstraint()->getPrettyString(), $package->getRequires());
         $rootRequirements = array_combine($rootRequirementTargets, $rootRequirementVersions);
@@ -50,39 +47,22 @@ class CheckCommand extends BaseCommand
 
         $visitedRootRequirements = array_fill_keys(array_keys($rootRequirements), false);
 
-        $modulesDirectory = $rootDirectory . DIRECTORY_SEPARATOR . $input->getOption('module-dir');
-        $output->writeln("Modules directory: $modulesDirectory", OutputInterface::VERBOSITY_VERBOSE);
-        if (!is_dir($modulesDirectory)) {
-            $output->writeln("<error>Modules directory does not exist: $modulesDirectory</error>");
-
+        $modulesDirectory = "";
+        if (!$this->getModulesDir($input, $output, $modulesDirectory)) {
             return 1;
         }
 
         $errors = false;
-        $modules = array_diff(scandir($modulesDirectory), ['.', '..']);
+        $modules = $this->getModules($input, $output);
         foreach ($modules as $module) {
-            $moduleDirectory = $modulesDirectory . DIRECTORY_SEPARATOR . $module;
-            if (!is_dir($moduleDirectory)) {
-                $output->writeln("Skipping module $module because it is not a directory.", OutputInterface::VERBOSITY_DEBUG);
-
-                continue;
-            }
-
-            $moduleComposerFile = $moduleDirectory . DIRECTORY_SEPARATOR . 'composer.json';
-            if (!is_file($moduleComposerFile)) {
-                $output->writeln("Skipping module $module because it doesn't contain a composer.json.", OutputInterface::VERBOSITY_DEBUG);
-
-                continue;
-            }
-
             try {
-                $moduleComposer = json_decode(file_get_contents($moduleComposerFile), true, flags: JSON_THROW_ON_ERROR);
+                $moduleComposer = $module->getComposerJson();
             } catch (JsonException) {
                 $moduleComposer = null;
             }
 
             if (!$moduleComposer) {
-                $output->writeln("Skipping module $module because the composer.json couldn't be parsed.", OutputInterface::VERBOSITY_VERBOSE);
+                $output->writeln("Skipping module $module->name because the composer.json couldn't be parsed.", OutputInterface::VERBOSITY_VERBOSE);
 
                 continue;
             }
