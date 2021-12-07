@@ -4,21 +4,21 @@ declare(strict_types=1);
 namespace Elephox\ComposerModuleSync;
 
 use Composer\Plugin\Capability\CommandProvider as ComposerCommandProvider;
+use Ergebnis\Composer\Normalize\NormalizePlugin;
 
 class CommandProvider implements ComposerCommandProvider
 {
     public function getCommands(): array
     {
-        $baseCommands = [
+        $commands = [
             new Commands\CheckCommand(),
             new Commands\AddRequireCommand(),
         ];
 
-        $softDependCommands = [];
-        if (class_exists('Ergebnis\Composer\Normalize\NormalizePlugin')) {
-            $softDependCommands[] = new Commands\NormalizeCommand();
+        if (class_exists(NormalizePlugin::class)) {
+            $commands[] = new Commands\NormalizeCommand();
         }
 
-        return $baseCommands + $softDependCommands;
+        return $commands;
     }
 }
