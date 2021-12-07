@@ -13,7 +13,7 @@ class BaseCommand extends ComposerBaseCommand
 {
     protected function addModulesDirOption(): self
     {
-        $this->addOption("module-dir", "m", InputOption::VALUE_REQUIRED, "Relative path to module directory.", "modules");
+        $this->addOption("modules-dir", "m", InputOption::VALUE_REQUIRED, "Relative path to modules directory.", "modules");
 
         return $this;
     }
@@ -22,7 +22,7 @@ class BaseCommand extends ComposerBaseCommand
     {
         $rootDirectory = $this->getApplication()->getInitialWorkingDirectory();
 
-        $modulesDirectory = $rootDirectory . DIRECTORY_SEPARATOR . $input->getOption('module-dir');
+        $modulesDirectory = $rootDirectory . DIRECTORY_SEPARATOR . $input->getOption('modules-dir');
         if (is_dir($modulesDirectory)) {
             return true;
         }

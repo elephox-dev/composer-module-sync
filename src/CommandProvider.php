@@ -9,9 +9,16 @@ class CommandProvider implements ComposerCommandProvider
 {
     public function getCommands(): array
     {
-        return [
+        $baseCommands = [
             new Commands\CheckCommand(),
             new Commands\AddRequireCommand(),
         ];
+
+        $softDependCommands = [];
+        if (class_exists('Ergebnis\Composer\Normalize\NormalizePlugin')) {
+            $softDependCommands[] = new Commands\NormalizeCommand();
+        }
+
+        return $baseCommands + $softDependCommands;
     }
 }

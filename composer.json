@@ -1,27 +1,32 @@
 {
     "name": "elephox/composer-module-sync",
     "description": "A composer plugin to sync requirements between submodules.",
-    "type": "composer-plugin",
-    "require": {
-        "php": ">=8.1",
-        "composer-plugin-api": "^2.1"
-    },
-    "require-dev": {
-        "composer/composer": "^2.0"
-    },
     "license": "MIT",
-    "autoload": {
-        "psr-4": {
-            "Elephox\\ComposerModuleSync\\": "src/"
-        }
-    },
+    "type": "composer-plugin",
     "authors": [
         {
             "name": "Ricardo Boss",
             "email": "contact@ricardoboss.de"
         }
     ],
+    "require": {
+        "php": ">=8.1",
+        "composer-plugin-api": "^2.1"
+    },
+    "require-dev": {
+        "composer/composer": "^2.0",
+        "ergebnis/composer-normalize": "^2.17"
+    },
+    "suggest": {
+        "ergebnis/composer-normalize": "To be able to use the module:normalize command."
+    },
     "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Elephox\\ComposerModuleSync\\": "src/"
+        }
+    },
     "extra": {
         "class": "Elephox\\ComposerModuleSync\\Plugin"
     }
