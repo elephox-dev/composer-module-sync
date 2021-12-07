@@ -18,7 +18,7 @@ class AddRequireCommand extends BaseCommand
         $this->addArgument("requirement", InputArgument::REQUIRED, "The requirement to add.");
         $this->addArgument("version", InputArgument::OPTIONAL, "The version of the requirement to add.", "*");
         $this->addArgument("modules", InputArgument::OPTIONAL | InputArgument::IS_ARRAY, "The module name(s) to add the package to.", []);
-        $this->addOption("module-dir", "m", InputOption::VALUE_REQUIRED, "Relative path to module directory.", "modules");
+        $this->addModulesDirOption();
         $this->addOption("no-main-composer", "u", description: "Whether to not add the package to the main composer.json file.");
     }
 
