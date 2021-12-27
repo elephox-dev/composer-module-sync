@@ -20,6 +20,7 @@ class NormalizeCommand extends BaseCommand
         $this->addOption("no-main-composer", description: "Whether not to normalize the main composer.json file.");
         $this->addOption("dry-run", description: "Show the results of normalizing, but do not modify any files.");
         $this->addOption("diff", description: "Show the results of normalizing.");
+        $this->addOption("force", description: "Continue normalizing, even when an error occurs.");
     }
 
     /**
@@ -33,19 +34,37 @@ class NormalizeCommand extends BaseCommand
             $modules = array_filter($modules, static fn($module) => in_array($module->name, $selectedModules, true));
         }
 
+        $finalExitCode = 0;
+        $isDryRun = false;
         $args = "";
         if ($input->getOption("dry-run")) {
             $args .= " --dry-run";
+            $isDryRun = true;
         }
 
         if ($input->getOption("diff")) {
             $args .= " --diff";
         }
 
+        $force = $input->getOption("force");
+
         if (!$input->getOption("no-main-composer")) {
             $output->writeln("Normalizing main composer.json...");
 
-            $this->getApplication()->doRun(new StringInput("normalize$args"), $output);
+            $exitCode = $this->getApplication()->doRun(new StringInput("normalize$args"), $output);
+            if ($exitCode !== 0) {
+                if ($isDryRun) {
+                    $output->writeln("<warn>Main composer.json was not normalized</warn>");
+                } else {
+                    $output->writeln("<error>Failed to normalize main composer.json</error>");
+
+                    if (!$force) {
+                        return $exitCode;
+                    }
+                }
+
+                $finalExitCode = 1;
+            }
         }
 
         foreach ($modules as $module) {
@@ -57,9 +76,22 @@ class NormalizeCommand extends BaseCommand
                 $path = str_replace("\\", "\\\\", $path);
             }
 
-            $this->getApplication()->doRun(new StringInput("normalize$args -- $path"), $output);
+            $exitCode = $this->getApplication()->doRun(new StringInput("normalize$args -- $path"), $output);
+            if ($exitCode !== 0) {
+                if ($isDryRun) {
+                    $output->writeln("<warn>$module->name composer.json was not normalized</warn>");
+                } else {
+                    $output->writeln("<error>Failed to normalize $module->name composer.json</error>");
+
+                    if (!$force) {
+                        return $exitCode;
+                    }
+                }
+
+                $finalExitCode = 1;
+            }
         }
 
-        return 0;
+        return $finalExitCode;
     }
 }
