@@ -122,6 +122,7 @@ class CheckCommand extends BaseCommand
                 $ownNamespace = "elephox/" . strtolower($module->name);
                 $dependenciesByCode = array_unique(array_filter($dependenciesByCode, static fn ($d) => $d !== $ownNamespace));
                 $moduleRequirementNames = array_keys($moduleRequirements);
+                $usedRequirements = array_fill_keys($moduleRequirementNames, false);
 
                 $output->writeln(sprintf("\t%d internal dependencies found.", count($dependenciesByCode)), OutputInterface::VERBOSITY_VERBOSE);
                 foreach ($dependenciesByCode as $dependency) {
@@ -130,6 +131,19 @@ class CheckCommand extends BaseCommand
                         $output->writeln("<error>Module '$module->name' uses namespaces of '$dependency' but the requirement in composer.json is missing.</error>");
 
                         $errors = true;
+                    }
+
+                    $usedRequirements[$dependency] = true;
+                }
+
+                $unusedRequirements = array_keys(array_filter($usedRequirements, static fn($visited) => !$visited));
+                if (empty($unusedRequirements)) {
+                    $output->writeln("\tAll internal requirements are in sync.", OutputInterface::VERBOSITY_VERBOSE);
+                } else {
+                    $output->writeln('<warning>Following module requirements were not used and can be removed:</warning>');
+
+                    foreach ($unusedRequirements as $requirement) {
+                        $output->writeln("\t\t- $requirement");
                     }
                 }
             }
