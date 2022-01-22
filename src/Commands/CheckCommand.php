@@ -3,7 +3,10 @@ declare(strict_types=1);
 
 namespace Elephox\ComposerModuleSync\Commands;
 
+use FilesystemIterator;
 use JsonException;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -14,10 +17,13 @@ class CheckCommand extends BaseCommand
         $this->setName('modules:check');
         $this->setDescription('Check if all requirements are in sync.');
         $this->addModulesDirOption();
+        $this->addOption('namespaces');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $checkNamespaces = (bool)$input->getOption('namespaces');
+
         $package = $this->getComposer()?->getPackage();
         if (!$package) {
             $output->writeln('<error>No package found.</error>');
@@ -90,6 +96,41 @@ class CheckCommand extends BaseCommand
                     $output->writeln("<error>Module $moduleName requires $moduleRequirement@$moduleRequirementVersion, but it is not in the composer.json file.</error>");
 
                     $errors = true;
+                }
+            }
+
+            if ($checkNamespaces) {
+                $output->writeln("\tChecking namespaces...", OutputInterface::VERBOSITY_VERBOSE);
+
+                $dependenciesByCode = [];
+                $recursiveIterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname($module->composerJsonPath), FilesystemIterator::KEY_AS_PATHNAME | FilesystemIterator::CURRENT_AS_FILEINFO));
+                /**
+                 * @var \SplFileInfo $fileInfo
+                 */
+                foreach ($recursiveIterator as $fileInfo) {
+                    if ($fileInfo->getExtension() !== "php") {
+                        continue;
+                    }
+
+                    $contents = file_get_contents($fileInfo->getRealPath());
+                    preg_match_all('/use Elephox\\\\([^\\\\]*)/im', $contents, $matches);
+                    foreach ($matches[1] as $elephoxNamespace) {
+                        $dependenciesByCode[] = "elephox/" . strtolower($elephoxNamespace);
+                    }
+                }
+
+                $ownNamespace = "elephox/" . strtolower($module->name);
+                $dependenciesByCode = array_unique(array_filter($dependenciesByCode, static fn ($d) => $d !== $ownNamespace));
+                $moduleRequirementNames = array_keys($moduleRequirements);
+
+                $output->writeln(sprintf("\t%d internal dependencies found.", count($dependenciesByCode)), OutputInterface::VERBOSITY_VERBOSE);
+                foreach ($dependenciesByCode as $dependency) {
+                    $output->writeln("\t\t- " . $dependency, OutputInterface::VERBOSITY_VERY_VERBOSE);
+                    if (!in_array($dependency, $moduleRequirementNames, true)) {
+                        $output->writeln("<error>Module '$module->name' uses namespaces of '$dependency' but the requirement in composer.json is missing.</error>");
+
+                        $errors = true;
+                    }
                 }
             }
         }
