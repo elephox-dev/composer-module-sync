@@ -31,7 +31,7 @@ class CheckCommand extends BaseCommand
             return 1;
         }
 
-        $output->writeln('Checking requirements...', OutputInterface::VERBOSITY_VERBOSE);
+        $output->writeln('<info>Checking requirements...</info>');
 
         $rootRequirementTargets = array_map(static fn($require) => $require->getTarget(), $package->getRequires());
         $rootRequirementVersions = array_map(static fn($require) => $require->getConstraint()->getPrettyString(), $package->getRequires());
@@ -43,12 +43,12 @@ class CheckCommand extends BaseCommand
 
         $output->writeln("Root requirements:", OutputInterface::VERBOSITY_DEBUG);
         foreach ($rootRequirements as $requirement => $version) {
-            $output->writeln("\t$requirement: $version", OutputInterface::VERBOSITY_DEBUG);
+            $output->writeln("\t<info>$requirement</info>: $version", OutputInterface::VERBOSITY_DEBUG);
         }
 
         $output->writeln("Root replacements:", OutputInterface::VERBOSITY_DEBUG);
         foreach ($rootReplacements as $replacement => $version) {
-            $output->writeln("\t$replacement: $version", OutputInterface::VERBOSITY_DEBUG);
+            $output->writeln("\t<info>$replacement</info>: $version", OutputInterface::VERBOSITY_DEBUG);
         }
 
         $visitedRootRequirements = array_fill_keys(array_keys($rootRequirements), false);
@@ -68,39 +68,43 @@ class CheckCommand extends BaseCommand
             }
 
             if (!$moduleComposer) {
-                $output->writeln("Skipping module $module->name because the composer.json couldn't be parsed.", OutputInterface::VERBOSITY_VERBOSE);
+                $output->writeln("Skipping module '$module->name' because the composer.json couldn't be parsed.", OutputInterface::VERBOSITY_VERBOSE);
 
                 continue;
             }
 
             $moduleName = $moduleComposer['name'];
             $moduleRequirements = $moduleComposer['require'] ?? [];
+            $moduleSuggests = $moduleComposer['suggest'] ?? [];
 
-            $output->writeln("<info>Checking module $moduleName...</info>", OutputInterface::VERBOSITY_VERY_VERBOSE);
+            $output->writeln("Checking module <info>$moduleName</info>...", OutputInterface::VERBOSITY_VERBOSE);
 
+            $output->writeln("\t<info>Checking requirements...</info>", OutputInterface::VERBOSITY_VERY_VERBOSE);
             foreach ($moduleRequirements as $moduleRequirement => $moduleRequirementVersion) {
-                $output->writeln("\tChecking requirement $moduleRequirement@$moduleRequirementVersion...", OutputInterface::VERBOSITY_DEBUG);
+                $output->write("\t\t- $moduleRequirement@$moduleRequirementVersion: ", options: OutputInterface::VERBOSITY_DEBUG);
                 if (array_key_exists($moduleRequirement, $rootRequirements)) {
                     if ($rootRequirements[$moduleRequirement] !== $moduleRequirementVersion) {
-                        $output->writeln("<error>Module $moduleName requires $moduleRequirement@$moduleRequirementVersion, but the version is not the same as in the composer.json file ($rootRequirements[$moduleRequirement]).</error>");
+                        $output->writeln("<error>Version mismatch.</error>", OutputInterface::VERBOSITY_DEBUG);
+                        $output->writeln("<error>Module '$moduleName' requires '$moduleRequirement@$moduleRequirementVersion', but the version is not the same as in the root composer.json file ($rootRequirements[$moduleRequirement]).</error>");
 
                         $errors = true;
                     } else {
-                        $output->writeln("\t\tOk. Marked as visited.", OutputInterface::VERBOSITY_DEBUG);
+                        $output->writeln("<info>Ok.</info>", OutputInterface::VERBOSITY_DEBUG);
 
                         $visitedRootRequirements[$moduleRequirement] = true;
                     }
                 } else if (array_key_exists($moduleRequirement, $rootReplacements)) {
-                    $output->writeln("\t\tOk. Is replaced by {$package->getName()}@$rootReplacements[$moduleRequirement].", OutputInterface::VERBOSITY_DEBUG);
+                    $output->writeln("<info>Ok (replaced by {$package->getName()}@$rootReplacements[$moduleRequirement]).</info>", OutputInterface::VERBOSITY_DEBUG);
                 } else {
-                    $output->writeln("<error>Module $moduleName requires $moduleRequirement@$moduleRequirementVersion, but it is not in the composer.json file.</error>");
+                    $output->writeln("<error>Missing in root.</error>", OutputInterface::VERBOSITY_DEBUG);
+                    $output->writeln("<error>Module '$moduleName' requires '$moduleRequirement@$moduleRequirementVersion', but the requirement is not in the root composer.json file.</error>");
 
                     $errors = true;
                 }
             }
 
             if ($checkNamespaces) {
-                $output->writeln("\tChecking namespaces...", OutputInterface::VERBOSITY_VERBOSE);
+                $output->writeln("\t<info>Checking namespaces...</info>", OutputInterface::VERBOSITY_VERBOSE);
 
                 $dependenciesByCode = [];
                 $recursiveIterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname($module->composerJsonPath), FilesystemIterator::KEY_AS_PATHNAME | FilesystemIterator::CURRENT_AS_FILEINFO));
@@ -121,14 +125,19 @@ class CheckCommand extends BaseCommand
 
                 $ownNamespace = "elephox/" . strtolower($module->name);
                 $dependenciesByCode = array_unique(array_filter($dependenciesByCode, static fn ($d) => $d !== $ownNamespace));
-                $moduleRequirementNames = array_keys($moduleRequirements);
+                $moduleRequirementNames = array_filter(array_keys($moduleRequirements), static fn ($r) => str_starts_with($r, "elephox/"));
+                $moduleSuggestsNames = array_filter(array_keys($moduleSuggests), static fn($r) => str_starts_with($r, "elephox/"));
                 $usedRequirements = array_fill_keys($moduleRequirementNames, false);
 
-                $output->writeln(sprintf("\t%d internal dependencies found.", count($dependenciesByCode)), OutputInterface::VERBOSITY_VERBOSE);
                 foreach ($dependenciesByCode as $dependency) {
-                    $output->writeln("\t\t- " . $dependency, OutputInterface::VERBOSITY_VERY_VERBOSE);
-                    if (!in_array($dependency, $moduleRequirementNames, true)) {
-                        $output->writeln("<error>Module '$module->name' uses namespaces of '$dependency' but the requirement in composer.json is missing.</error>");
+                    $output->write("\t\t- $dependency: ", options: OutputInterface::VERBOSITY_DEBUG);
+                    if (in_array($dependency, $moduleSuggestsNames, true)) {
+                        $output->writeln("<info>Ok. Is suggested.</info>", OutputInterface::VERBOSITY_DEBUG);
+                    } else if (in_array($dependency, $moduleRequirementNames, true)) {
+                        $output->writeln("<info>Ok. Is required.</info>", OutputInterface::VERBOSITY_DEBUG);
+                    } else {
+                        $output->writeln("<error>Missing.</error>", OutputInterface::VERBOSITY_DEBUG);
+                        $output->writeln("<error>Module '$module->name' uses namespaces of '$dependency' but the requirement (or suggestion) in the modules composer.json is missing.</error>");
 
                         $errors = true;
                     }
@@ -140,10 +149,10 @@ class CheckCommand extends BaseCommand
                 if (empty($unusedRequirements)) {
                     $output->writeln("\tAll internal requirements are in sync.", OutputInterface::VERBOSITY_VERBOSE);
                 } else {
-                    $output->writeln('<warning>Following module requirements were not used and can be removed:</warning>');
+                    $output->writeln("<warning>Following internal requirement(s) in module '$module->name' were not used and can be removed:</warning>");
 
                     foreach ($unusedRequirements as $requirement) {
-                        $output->writeln("\t\t- $requirement");
+                        $output->writeln("\t- $requirement");
                     }
                 }
             }
