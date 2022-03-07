@@ -303,22 +303,23 @@ class ReleaseCommand extends BaseCommand
             $this->cd($workingDirectory, $output);
         }
 
-        // create GitHub release
-        $output->writeln("<info>Please enter release notes for $releaseTag. The token '%n' will be replaced by \\n</info>");
-        $releaseNotes = $this->getHelper('question')->ask($input, $output, new Question("<question>Release Notes:</question>\n"));
-        $releaseNotes = str_replace('%n', "\n", $releaseNotes);
-        $notesPath = $workingDirectory . DIRECTORY_SEPARATOR . "release-notes-$releaseTag.md";
-        file_put_contents($notesPath, $releaseNotes);
-        $this->shell(sprintf("gh release create %s --generate-notes --title %s --target %s --notes-file %s", $releaseTag, $releaseTag, "$releaseMajor.$releaseMinor.x", $notesPath), $output, $armed);
-
-        $output->writeln("======================================");
-        $output->writeln("<info>Release $releaseTag published for all modules</info>");
-
         if ($owd) {
             $this->cd($owd, $output);
 
             // major.minor.x auschecken
             $this->git("checkout $releaseMajor.$releaseMinor.x", execute: $armed);
+            $this->git("pull", $output, $armed);
+
+            // create GitHub release
+            $output->writeln("<info>Please enter release notes for $releaseTag. The token '%n' will be replaced by \\n</info>");
+            $releaseNotes = $this->getHelper('question')->ask($input, $output, new Question("<question>Release Notes:</question>\n"));
+            $releaseNotes = str_replace('%n', "\n", $releaseNotes);
+            $notesPath = $workingDirectory . DIRECTORY_SEPARATOR . "release-notes-$releaseTag.md";
+            file_put_contents($notesPath, $releaseNotes);
+            $this->shell(sprintf("gh release create %s --generate-notes --title %s --target %s --notes-file %s", $releaseTag, $releaseTag, "$releaseMajor.$releaseMinor.x", $notesPath), $output, $armed);
+
+            $output->writeln("======================================");
+            $output->writeln("<info>Release $releaseTag published for all modules</info>");
         }
 
         $output->writeln("Cleaning up...");
