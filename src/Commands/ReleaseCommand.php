@@ -297,7 +297,7 @@ class ReleaseCommand extends BaseCommand
                 }
             }
 
-            $output->writeln("<info>Pushing changes to remote repository and creating new release ($moduleRepositoryUrl)</info>", OutputInterface::VERBOSITY_VERBOSE);
+            $output->writeln("<info>Pushing changes to remote repository ($moduleRepositoryUrl)</info>", OutputInterface::VERBOSITY_VERBOSE);
             $this->git("push --all", $output, $armed);
 
             $this->cd($workingDirectory, $output);
