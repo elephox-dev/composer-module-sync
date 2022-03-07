@@ -5,11 +5,10 @@ namespace Elephox\ComposerModuleSync\Commands;
 
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class AddRequireCommand extends BaseCommand
+class RequireCommand extends BaseCommand
 {
     public function configure(): void
     {

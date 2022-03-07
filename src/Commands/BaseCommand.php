@@ -24,6 +24,8 @@ class BaseCommand extends ComposerBaseCommand
 
         $modulesDirectory = $rootDirectory . DIRECTORY_SEPARATOR . $input->getOption('modules-dir');
         if (is_dir($modulesDirectory)) {
+            $modulesDirectory = realpath($modulesDirectory);
+
             return true;
         }
 

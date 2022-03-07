@@ -12,7 +12,8 @@ class CommandProvider implements ComposerCommandProvider
     {
         $commands = [
             new Commands\CheckCommand(),
-            new Commands\AddRequireCommand(),
+            new Commands\RequireCommand(),
+            new Commands\ReleaseCommand(),
         ];
 
         if (class_exists(NormalizePlugin::class)) {
