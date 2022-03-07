@@ -17,8 +17,6 @@ class ReleaseCommand extends BaseCommand
 {
     private const MAJOR_RELEASE_BRANCH = "main";
 
-    protected ?string $gitPath = null;
-
     public function configure(): void
     {
         $this->setName('modules:release');
@@ -201,8 +199,7 @@ class ReleaseCommand extends BaseCommand
             throw new RuntimeException(sprintf('Directory "%s" was not created', $workingDirectory));
         }
         $owd = getcwd();
-        chdir($workingDirectory);
-        $output->writeln("$ cd $workingDirectory", OutputInterface::VERBOSITY_DEBUG);
+        $this->cd($workingDirectory, $output);
 
         $extra = $this->getComposer()?->getPackage()->getExtra();
         if (
@@ -227,12 +224,6 @@ class ReleaseCommand extends BaseCommand
         };
         array_unshift($modules, $monoRepoModule);
 
-        $output->writeln("<info>Please enter release notes for $releaseTag. '%n' will be replaced by \\n</info>");
-        $releaseNotes = $this->getHelper('question')->ask($input, $output, new Question("<question>Release Notes:</question>\n"));
-        $releaseNotes = str_replace('%n', "\n", $releaseNotes);
-        $notesPath = $workingDirectory . DIRECTORY_SEPARATOR . "release-notes-$releaseTag.md";
-        file_put_contents($notesPath, $releaseNotes);
-
         $output->writeln("<info>About to release $releaseTag for " . count($modules) . " modules (including monorepo).</info>");
         if (!$armed) {
             $output->writeln("<warning>Dry run. No actual changes will be made.</warning>");
@@ -251,34 +242,33 @@ class ReleaseCommand extends BaseCommand
             $moduleRepositoryUrl = $repositoryBase . $normalizedModuleName;
             $moduleDirectory = $workingDirectory . DIRECTORY_SEPARATOR . $normalizedModuleName;
 
-            // modul repo auschecken
+            // check out module repo
             $this->git("clone $moduleRepositoryUrl $normalizedModuleName", $output, $armed);
             if (!$armed && !mkdir($moduleDirectory, 0777, true) && !is_dir($moduleDirectory)) {
                 throw new RuntimeException(sprintf('Directory "%s" was not created', $moduleDirectory));
             }
-            chdir($moduleDirectory);
-            $output->writeln("$ cd $moduleDirectory", OutputInterface::VERBOSITY_DEBUG);
+            $this->cd($moduleDirectory, $output);
 
             if ($typeArg === 'major') {
-                // main branch taggen
+                // tag main branch
                 $output->writeln("<info>Tagging major release branch (" . self::MAJOR_RELEASE_BRANCH . ")</info>", OutputInterface::VERBOSITY_VERBOSE);
                 $this->git("checkout " . self::MAJOR_RELEASE_BRANCH, $output, $armed);
                 $this->git("tag $releaseTag", $output, $armed);
 
-                // major.x branch erzeugen
+                // create major.x branch
                 $output->writeln("<info>Creating new minor branch ($releaseMajor.x)</info>", OutputInterface::VERBOSITY_VERBOSE);
                 $this->git("branch $releaseMajor.x", $output, $armed);
 
-                // major.0.x branch erzeugen
+                // create major.0.x branch
                 $output->writeln("<info>Creating new patch branch ($releaseMajor.0.x)</info>", OutputInterface::VERBOSITY_VERBOSE);
                 $this->git("branch $releaseMajor.0.x", $output, $armed);
             } else if ($typeArg === 'minor') {
-                // major.x branch taggen
+                // tag major.x branch
                 $output->writeln("<info>Tagging major branch ($releaseMajor.x)</info>", OutputInterface::VERBOSITY_VERBOSE);
                 $this->git("checkout $releaseMajor.x", $output, $armed);
                 $this->git("tag $releaseTag", $output, $armed);
 
-                // major.minor.x branch erzeugen
+                // create major.minor.x branch
                 $output->writeln("<info>Creating new patch branch ($releaseMajor.$releaseMinor.x)</info>", OutputInterface::VERBOSITY_VERBOSE);
                 $this->git("branch $releaseMajor.$releaseMinor.x", $output, $armed);
 
@@ -289,7 +279,7 @@ class ReleaseCommand extends BaseCommand
                     $this->git("merge $releaseMajor.x", $output, $armed);
                 }
             } else {
-                // major.minor.x branch taggen
+                // tag major.minor.x branch
                 $output->writeln("<info>Tagging minor branch ($releaseMajor.$releaseMinor.x)</info>", OutputInterface::VERBOSITY_VERBOSE);
                 $this->git("checkout $releaseMajor.$releaseMinor.x", $output, $armed);
                 $this->git("tag $releaseTag", $output, $armed);
@@ -308,21 +298,24 @@ class ReleaseCommand extends BaseCommand
             }
 
             $output->writeln("<info>Pushing changes to remote repository and creating new release ($moduleRepositoryUrl)</info>", OutputInterface::VERBOSITY_VERBOSE);
-            //$this->git("push --all", $output, $armed);
+            $this->git("push --all", $output, $armed);
 
-            // github release erzeugen (auch für jedes modul?)
-            $this->shell(sprintf("gh release create %s --generate-notes --title %s --target %s --notes-file %s", $releaseTag, $releaseTag, "$releaseMajor.$releaseMinor.x", $notesPath), $output, $armed);
-
-            chdir($workingDirectory);
-            $output->writeln("$ cd $workingDirectory", OutputInterface::VERBOSITY_DEBUG);
+            $this->cd($workingDirectory, $output);
         }
+
+        // create GitHub release
+        $output->writeln("<info>Please enter release notes for $releaseTag. The token '%n' will be replaced by \\n</info>");
+        $releaseNotes = $this->getHelper('question')->ask($input, $output, new Question("<question>Release Notes:</question>\n"));
+        $releaseNotes = str_replace('%n', "\n", $releaseNotes);
+        $notesPath = $workingDirectory . DIRECTORY_SEPARATOR . "release-notes-$releaseTag.md";
+        file_put_contents($notesPath, $releaseNotes);
+        $this->shell(sprintf("gh release create %s --generate-notes --title %s --target %s --notes-file %s", $releaseTag, $releaseTag, "$releaseMajor.$releaseMinor.x", $notesPath), $output, $armed);
 
         $output->writeln("======================================");
         $output->writeln("<info>Release $releaseTag published for all modules</info>");
 
         if ($owd) {
-            chdir($owd);
-            $output->writeln("$ cd $owd", OutputInterface::VERBOSITY_DEBUG);
+            $this->cd($owd, $output);
 
             // major.minor.x auschecken
             $this->git("checkout $releaseMajor.$releaseMinor.x", execute: $armed);
@@ -337,6 +330,12 @@ class ReleaseCommand extends BaseCommand
     private function git(string $command, ?OutputInterface $output = null, bool $execute = true, false|null|string $default = null): false|null|string
     {
         return $this->shell("git $command", $output, $execute, $default);
+    }
+
+    private function cd(string $dir, ?OutputInterface $output = null): void
+    {
+        $output?->writeln("$ cd $dir", OutputInterface::VERBOSITY_DEBUG);
+        chdir($dir);
     }
 
     private function shell(string $command, ?OutputInterface $output = null, bool $execute = true, false|null|string $default = null): false|null|string
