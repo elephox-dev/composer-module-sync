@@ -29,5 +29,10 @@
     },
     "extra": {
         "class": "Elephox\\ComposerModuleSync\\Plugin"
+    },
+    "config": {
+        "allow-plugins": {
+            "ergebnis/composer-normalize": true
+        }
     }
 }
